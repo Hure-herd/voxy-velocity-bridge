@@ -30,5 +30,6 @@ tasks.withType(JavaCompile).configureEach {
 
 jar {
 	archiveBaseName = 'voxy-velocity-bridge'
+	archiveVersion = ''
 	duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
