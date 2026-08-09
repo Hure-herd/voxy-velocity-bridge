@@ -61,12 +61,17 @@ java {
 }
 
 jar {
+	archiveBaseName = 'voxy-fabric-bridge'
 	def projectName = project.name
 	inputs.property "projectName", projectName
 
 	from("LICENSE") {
 		rename { "${it}_$projectName"}
 	}
+}
+
+sourcesJar {
+	archiveBaseName = 'voxy-fabric-bridge'
 }
 
 // configure the maven publication

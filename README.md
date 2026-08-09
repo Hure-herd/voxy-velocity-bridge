@@ -141,11 +141,11 @@ Voxy 缺失或版本不兼容时自动静默回退，不影响正常游戏。
 ```bash
 # Fabric 客户端模组
 cd fabric
-./gradlew build          # 产物: fabric/build/libs/voxy-velocity-bridge-1.0.0.jar
+./gradlew build          # 产物: fabric/build/libs/voxy-fabric-bridge-1.0.0.jar
 
 # Velocity 插件
 cd velocity
-./gradlew build          # 产物: velocity/build/libs/vvb-velocity-1.0.0.jar
+./gradlew build          # 产物: velocity/build/libs/voxy-velocity-bridge-1.0.0.jar
 ```
 
 ## 10. 部署
@@ -159,7 +159,7 @@ cd velocity
 
 `mods/` 目录放入：
 
-- `voxy-velocity-bridge-1.0.0.jar`（本模组）
+- `voxy-fabric-bridge-1.0.0.jar`（本模组）
 - `voxy`（需 26.2 兼容版本）
 - 依赖：`fabric-api`、`fabric-language-kotlin`
 
