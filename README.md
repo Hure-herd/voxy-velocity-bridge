@@ -152,16 +152,10 @@ cd velocity
 |---|---|
 | 后端服务器 | 完全通用（原版/Fabric/Paper 均可，无需改后端） |
 | 代理 | 仅 Velocity；换 BungeeCord 需重写插件，payload 协议与客户端不变 |
-| Minecraft 版本 | 26.1.2 ~ 26.2（单 jar 通吃，同一 mojmap API） |
+| Minecraft 版本 | 26.2 专用（StreamCodec/Identifier API + 对应 Voxy 版本） |
 | Voxy | 耦合 `WorldIdentifier` / `IVoxyRenderSystemHolder`（非稳定 API），升级 Voxy 需回归测试；耦合点收敛在 `VoxyAdapter` 与 `WorldIdentifierMixin` |
 
 已知限制：
 
 - 每个后端完全独立缓存（同一地图的两个后端不共享地形数据）
 - 首次进入后端区域时 Voxy 需现场烘焙网格，加载较慢属正常现象
-
-## License
-
-Copyright (C) 2026 Hureherd
-
-本项目基于 **GNU Lesser General Public License v3.0（LGPL-3.0-only）** 发布，详见 [LICENSE](LICENSE)。
