@@ -14,19 +14,6 @@ import org.slf4j.Logger;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 
-/**
- * VVB Velocity 侧插件。
- *
- * 在玩家切换后端时向客户端发送双阶段 payload：
- *   1. ServerPreConnectEvent   -> PREPARE（切换开始前，告知即将到来的后端）
- *   2. ServerPostConnectEvent  -> CONFIRM（切换成功后，确认当前后端）
- *
- * channel: vvb:backend（字节布局与 Fabric 端 VvbBackendPayload 对应）
- *   1 byte phase + VarInt 长度前缀 + UTF-8 字节（Minecraft 协议格式）
- *
- * 本插件不关心后端服务器的具体类型（原版/Fabric/Paper 均可），
- * 只负责把后端注册名透传给客户端用于 Voxy 世界缓存隔离。
- */
 @Plugin(
 		id = "vvb-velocity",
 		name = "Voxy Velocity Bridge",
@@ -71,7 +58,6 @@ public class VvbVelocityPlugin {
 	}
 
 	private static byte[] encode(Phase phase, String backend) {
-		// 与 Fabric 端 ByteBufCodecs.BYTE + STRING_UTF8 对齐
 		byte[] name = backend.getBytes(StandardCharsets.UTF_8);
 		ByteArrayOutputStream bos = new ByteArrayOutputStream();
 		bos.write(phase.id);

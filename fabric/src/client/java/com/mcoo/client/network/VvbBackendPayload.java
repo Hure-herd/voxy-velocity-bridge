@@ -7,15 +7,6 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 
-/**
- * vvb:backend 通道的 payload。
- *
- * 双阶段协议：
- *  - PREPARE (0x01)：Velocity 在玩家切换后端前发出，客户端记录 pendingBackend
- *  - CONFIRM (0x02)：Velocity 在玩家成功连上后端后发出，客户端确认 currentBackend
- *
- * 字节布局：1 byte phase + UTF-8 backendName（与 Velocity 端 DataOutputStream 对应）
- */
 public record VvbBackendPayload(Phase phase, String backendName) implements CustomPacketPayload {
 
 	public static final Type<VvbBackendPayload> TYPE =
