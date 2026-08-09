@@ -152,7 +152,7 @@ cd velocity
 |---|---|
 | 后端服务器 | 完全通用（原版/Fabric/Paper 均可，无需改后端） |
 | 代理 | 仅 Velocity；换 BungeeCord 需重写插件，payload 协议与客户端不变 |
-| Minecraft 版本 | 26.2 专用（StreamCodec/Identifier API + 对应 Voxy 版本） |
+| Minecraft 版本 | 26.1.2 ~ 26.2（单 jar 通吃，同一 mojmap API） |
 | Voxy | 耦合 `WorldIdentifier` / `IVoxyRenderSystemHolder`（非稳定 API），升级 Voxy 需回归测试；耦合点收敛在 `VoxyAdapter` 与 `WorldIdentifierMixin` |
 
 已知限制：
