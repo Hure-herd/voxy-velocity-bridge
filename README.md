@@ -1,49 +1,142 @@
 # Voxy Velocity Bridge (VVB)
 
-通过 Velocity 代理,让客户端 Voxy LOD 渲染在不同后端服务器之间自动切换世界缓存。
+> Voxy Velocity Bridge 是一个用于 Velocity 多子服网络的 Voxy 兼容附属，通过将 Velocity 后端服务器逻辑 ID 注入 Voxy 世界唯一标识，使玩家能够在同一代理连接中使用 `/server` 无缝切换不同后端，同时保证每个子服拥有完全独立且可持久恢复的 Voxy LOD 数据。
 
-## 解决的问题
+## 1. 解决的问题
 
-用 Velocity 做多服代理时,客户端连接同一个入口(25577)在多个后端服务器之间切换
-(`/server`)。Voxy 按 `WorldIdentifier.of(Level)` 计算世界 ID 并缓存地形渲染数据。
-默认情况下两个后端即使 seed 相同,客户端也复用同一份 Voxy 缓存——切换后端时会
-串世界(显示上一个服的地形)。
+Voxy 在普通单服环境下，可以根据 Minecraft 世界信息识别并保存对应的 LOD 数据。但在 Velocity 多子服环境中，客户端对外连接的是同一个代理地址，通过 `/server` 切换后端时，Voxy 不一定知道「现在已经不是原来的后端服务器了」。
 
-VVB 把"后端服务器身份"混入 Voxy 的世界 ID 计算:每个后端独立一套缓存目录,
-切服时渲染器自动重建并加载对应后端的缓存。
+当两个后端满足类似条件时：
 
-## 架构
-
-```
-                    ┌─────────────────────────────┐
-  玩家 (Fabric 客户端) │  vvb:backend payload 通道   │
-  ── 25577 ────────► │  Velocity 代理 (VVB 插件)    │
-                    │  PREPARE (切换前)             │
-                    │  CONFIRM (切换后)             │
-                    └──────────────┬──────────────┘
-                         ┌─────────┴─────────┐
-                    server1 (25565)    server2 (25566)
-                         └───────────────────┘
+```text
+dimension key = minecraft:overworld
+biome seed = 相同
+proxy address = 相同
 ```
 
-### 组件
+Voxy 会将它们识别为同一个世界，导致：
 
-| 组件 | 目录 | 职责 |
+- 一个服的远景出现在另一个服（串服）
+- LOD 数据串用、幽灵区块
+- 切服时打开错误的 Voxy 数据库
+- 数据库锁冲突、需要清缓存才能恢复
+- 同坐标但完全不同的两个世界相互污染
+
+## 2. 设计目标
+
+让 Voxy 的世界身份从：
+
+```text
+Proxy Address + Dimension + Seed
+```
+
+扩展为逻辑上的：
+
+```text
+Proxy Namespace + Backend Namespace + Dimension + Seed
+```
+
+即使两个服务器 seed 完全相同、维度相同、坐标相同、代理地址相同，也始终属于两个完全独立的 Voxy 世界。
+
+**非目标**：不重写 Voxy、不修改渲染/LOD 算法、不修改世界格式、不替代 Velocity、不修改 seed、不重新打包 Voxy。项目是 Voxy 的独立兼容附属。
+
+## 3. 架构
+
+```text
+ Velocity
+   │
+ VVB Velocity Plugin
+   │  当前 Backend Server ID
+   │  Custom Payload (vvb:backend)
+   ▼
+ Minecraft Client
+   │
+ VVB Fabric Mod
+   │
+ Voxy Adapter
+   ▼
+ Voxy
+```
+
+- **Velocity 插件**（`vvb-velocity`）：获取玩家当前后端，监听切换，通过自定义 payload 通道把后端逻辑 ID 发送给客户端
+- **Fabric 模组**（`voxy-velocity-bridge`）：接收 backend ID，维护状态机，在 Voxy 创建 WorldIdentifier 前注入 backend namespace，切服时正确重建渲染器
+
+## 4. 通信协议
+
+自定义 payload channel：`vvb:backend`
+
+双阶段协议：
+
+| 阶段 | 触发时机 | 客户端动作 |
 |---|---|---|
-| Velocity 插件 | `velocity/` | 监听 ServerPreConnect/ServerPostConnect,向玩家发送 PREPARE/CONFIRM payload |
-| Fabric 客户端模组 | `fabric/` | 接收 payload 更新 backend 状态;Mixin 注入 Voxy 世界 ID;切服后重建渲染器 |
+| PREPARE (0x01) | 切换前（ServerPreConnectEvent） | 记录 `pendingBackend` |
+| CONFIRM (0x02) | 切换成功后（ServerPostConnectEvent） | 确认 `currentBackend` / `worldBackend` |
 
-### 隔离原理
+字节布局：`1 byte phase + UTF-8 backendName`
 
-- Voxy 磁盘缓存路径 = `.voxy/<worldId>/`,`worldId = SHA-256(biomeSeed + key)`
-- 内存引擎缓存(WorldIdentifier.hashCode/equals)= `key + biomeSeed + dimension`
-- VVB 在 `WorldIdentifier.of(Level)` 返回处注入:有 backend 时 `biomeSeed ^= mixStafford13(backend.hashCode())`
-  - 一处注入,同时隔离**磁盘目录 + 内存引擎 + 配置存储**
-  - backend 为 null(直连无代理)时走 Voxy 原生逻辑,完全 fail-safe
+Backend ID 使用 **Velocity RegisteredServer Name**（如 `survival`、`creative`），而不是 IP/端口——服务器地址可能变化，逻辑服务器名更稳定。
 
-## 构建
+## 5. 世界隔离原理
 
-要求:JDK 25(客户端 mod)、Java 17+ 运行环境。
+### 5.1 World ID 设计
+
+参与世界唯一标识的数据：
+
+```text
+proxyNamespace + backendNamespace + dimensionKey + dimensionType + biomeSeed
+```
+
+例如 `vc|creative|minecraft:overworld|minecraft:overworld|123456789`，经 SHA-256 得到最终稳定 World ID。backend 不同 → Hash 不同 → Voxy 数据库不同。
+
+### 5.2 实现方式（Mixin 注入）
+
+在 `WorldIdentifier.of(Level)` 返回处注入（唯一入口收敛）：有 backend 时 `biomeSeed ^= mixStafford13(backend.hashCode())`，一处注入同时隔离：
+
+- **磁盘身份**：World ID（数据库目录）
+- **内存身份**：hashCode/equals（引擎缓存复用判断）
+
+### 5.3 渲染器重建
+
+切服后强制 `shutdownRenderer + setWorld + createRenderer`，让渲染器重新绑定当前 backend 对应的引擎（Voxy 的 `IVoxyRenderSystemHolder` 接口）。
+
+## 6. 切服时序
+
+双阶段协议避免错误时序：
+
+```text
+/server creative
+  → Velocity 捕获 ServerPreConnectEvent
+  → 发送 PREPARE (backend = creative)
+  → 客户端记录 pendingBackend = creative
+  → 旧 ClientLevel 卸载，新 ClientLevel 创建
+  → Voxy 创建新的 WorldIdentifier（读取 backend = creative）
+  → Velocity 发送 CONFIRM
+  → 客户端确认 currentBackend = creative，重建渲染器
+```
+
+客户端状态机：`currentBackend` / `pendingBackend` / `worldBackend`，退出时全部置空。
+
+## 7. 回退策略（Fail-Safe）
+
+没有收到 Velocity 插件 payload 时 `backendNamespace = null`，完全走 Voxy 原始行为。模组可同时用于：普通单服、Velocity 网络、本地世界、LAN、未安装插件的服务器。
+
+Voxy 缺失或版本不兼容时自动静默回退，不影响正常游戏。
+
+## 8. 数据目录
+
+```text
+.voxy/
+└── saves/
+    └── <proxy>/
+        ├── <backend A>/   ← 8ac0319...（hash 目录）
+        └── <backend B>/   ← d42f617...
+```
+
+每个 backend 独立目录，切回原服自动恢复原缓存。第一版不自动迁移旧缓存（旧缓存无法可靠判断来源，迁移可能污染新目录）。
+
+## 9. 构建
+
+要求：JDK 25（Fabric 模组）、Java 17+ 运行环境。
 
 ```bash
 # Fabric 客户端模组
@@ -55,58 +148,50 @@ cd velocity
 ./gradlew build          # 产物: velocity/build/libs/vvb-velocity-1.0.0.jar
 ```
 
-## 部署
+## 10. 部署
 
-### 1. Velocity 代理(25577)
+### Velocity 代理
 
-- 把 `vvb-velocity-1.0.0.jar` 放入 `plugins/` 目录
-- `velocity.toml` 中注册后端服务器,名字即 backend 标识(建议语义化,如 `survival`/`creative`)
+- 将 `vvb-velocity-1.0.0.jar` 放入 `plugins/` 目录
+- 在 `velocity.toml` 中注册后端服务器，注册名即 backend 标识（建议语义化，如 `survival`/`creative`）
 
-### 2. 客户端(26.2-Fabric)
+### 客户端
 
-`mods/` 目录放入:
+`mods/` 目录放入：
 
-- `voxy-velocity-bridge-1.0.0.jar`(本模组)
-- `voxy-0.2.18-beta.jar`(Voxy,需 26.2 兼容版)
-- 依赖:`fabric-api`、`fabric-language-kotlin`(Voxy 运行需要)
+- `voxy-velocity-bridge-1.0.0.jar`（本模组）
+- `voxy`（需 26.2 兼容版本）
+- 依赖：`fabric-api`、`fabric-language-kotlin`
 
-> Voxy 缺失或版本不兼容时,模组自动静默回退,不影响正常游戏。
+### 后端服务器
 
-### 3. 后端服务器
+无需任何修改。插件只转发后端注册名，不注入后端服务器。
 
-**无需任何修改**。插件只转发后端注册名,不注入后端服务器。
+## 11. 验证
 
-## 验证
+1. 客户端通过代理进入 Survival，等待 Voxy 地形生成
+2. `/server creative` 切换
+3. 日志出现 `[VVB] survival -> creative`（切服确认）与 `[VVB] Voxy renderer rebuilt, backend = creative`
+4. 画面应切换到 Creative 的地形；切回 Survival 后恢复原 LOD
 
-1. 客户端通过代理(25577)进入 server1,等待 Voxy 地形生成
-2. `/server server2` 切换
-3. 观察日志:`[VVB] server1 -> server2`(切服确认)
-4. 画面应切换到 server2 的地形(每个后端独立缓存,首次进入需重新生成)
+验收标准：同 seed / 同维度 / 同坐标不串服；多次快速切服不崩溃；无数据库 LOCK；不需要手动清缓存；无插件时 Voxy 正常工作。
 
-日志关键字:
-
-- `[VVB] channel vvb:backend registered` —— 插件加载成功
-- `[VVB] xxx -> survival (PREPARE/CONFIRM)` —— 插件发送阶段
-- `[VVB] Voxy renderer rebuilt, backend = survival` —— 客户端渲染器重建
-
-## 兼容性
+## 12. 兼容性与已知限制
 
 | 维度 | 说明 |
 |---|---|
-| 后端服务器 | 完全通用(原版/Fabric/Paper 均可,无需改后端) |
-| 代理 | 仅 Velocity;换 BungeeCord 需重写插件,payload 协议与客户端不变 |
-| Minecraft 版本 | 26.2 专用(StreamCodec/Identifier API + voxy 0.2.18-beta) |
-| Voxy | 耦合 `commonImpl.WorldIdentifier` / `IVoxyRenderSystemHolder`(非稳定 API),升级 Voxy 需回归测试;耦合点收敛在 `VoxyAdapter` 与 `WorldIdentifierMixin` |
+| 后端服务器 | 完全通用（原版/Fabric/Paper 均可，无需改后端） |
+| 代理 | 仅 Velocity；换 BungeeCord 需重写插件，payload 协议与客户端不变 |
+| Minecraft 版本 | 26.2 专用（StreamCodec/Identifier API + 对应 Voxy 版本） |
+| Voxy | 耦合 `WorldIdentifier` / `IVoxyRenderSystemHolder`（非稳定 API），升级 Voxy 需回归测试；耦合点收敛在 `VoxyAdapter` 与 `WorldIdentifierMixin` |
 
-## 已知限制
+已知限制：
 
-- 每个后端完全独立缓存(同一地图的两个后端不共享地形数据,会各自生成一份)
-- 首次进入后端区域时 Voxy 需现场烘焙网格,加载较慢属正常现象
-- 渲染器重建依赖 Voxy 的 `IVoxyRenderSystemHolder` 接口,该接口为 Voxy mixin 实现,版本差异可能导致重建失效(此时会退化为原版 Voxy 行为)
+- 每个后端完全独立缓存（同一地图的两个后端不共享地形数据）
+- 首次进入后端区域时 Voxy 需现场烘焙网格，加载较慢属正常现象
 
 ## License
 
 Copyright (C) 2026 Hureherd
 
-This project is licensed under the **GNU Lesser General Public License v3.0 (LGPL-3.0-only)**.
-See the [LICENSE](LICENSE) file for details.
+本项目基于 **GNU Lesser General Public License v3.0（LGPL-3.0-only）** 发布，详见 [LICENSE](LICENSE)。
