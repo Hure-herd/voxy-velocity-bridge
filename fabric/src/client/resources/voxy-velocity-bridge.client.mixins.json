@@ -1,0 +1,14 @@
+{
+	"required": true,
+	"package": "com.mcoo.client.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"client": [
+		"WorldIdentifierMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	},
+	"overwrites": {
+		"requireAnnotations": true
+	}
+}

@@ -1,0 +1,37 @@
+{
+	"schemaVersion": 1,
+	"id": "voxy-velocity-bridge",
+	"version": "${version}",
+	"name": "Voxy Velocity Bridge",
+	"description": "Voxy LOD world cache isolation across Velocity backend servers.",
+	"authors": [
+		"Hureherd"
+	],
+	"contact": {},
+	"license": "LGPL-3.0-only",
+	"icon": "assets/voxy-velocity-bridge/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.mcoo.VoxyVelocityBridge"
+		],
+		"client": [
+			"com.mcoo.client.VoxyVelocityBridgeClient"
+		]
+	},
+	"mixins": [
+		{
+			"config": "voxy-velocity-bridge.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.19.3",
+		"minecraft": "~26.2",
+		"java": ">=25",
+		"fabric-api": "*"
+	},
+	"suggests": {
+		"voxy": "*"
+	}
+}

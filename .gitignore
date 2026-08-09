@@ -1,0 +1,52 @@
+# gradle
+
+.gradle/
+build/
+out/
+classes/
+
+# eclipse
+
+*.launch
+
+# idea
+
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# vscode
+
+.settings/
+.vscode/
+bin/
+.classpath
+.project
+
+# macos
+
+*.DS_Store
+
+# fabric
+
+run/
+
+# java
+
+hs_err_*.log
+replay_*.log
+*.hprof
+*.jfr
+
+# vvb: local test environment (JDK/worlds/secrets)
+server1/
+server2/
+vc/
+
+# vvb: personal memory link & local tooling
+.agent-memory/
+.mcp.json
+
+# vvb: build artifacts (use GitHub Releases instead)
+release/

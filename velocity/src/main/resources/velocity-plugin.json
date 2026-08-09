@@ -1,0 +1,10 @@
+{
+	"id": "vvb-velocity",
+	"name": "Voxy Velocity Bridge",
+	"version": "1.0.0",
+	"description": "Voxy LOD world cache isolation across backend servers",
+	"authors": [
+		"Hureherd"
+	],
+	"main": "com.mcoo.vvb.VvbVelocityPlugin"
+}
