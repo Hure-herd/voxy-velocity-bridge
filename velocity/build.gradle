@@ -29,7 +29,7 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 jar {
-	archiveBaseName = 'voxy-velocity-bridge'
+	archiveBaseName = 'voxy-velocity-bridge-vc'
 	archiveVersion = ''
 	duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }

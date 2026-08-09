@@ -42,22 +42,22 @@ Proxy Namespace + Backend Namespace + Dimension + Seed
 
 ```text
  Velocity
-   │
+ │
  VVB Velocity Plugin
-   │  当前 Backend Server ID
-   │  Custom Payload (vvb:backend)
-   ▼
+ │ Current backend server ID
+ │ Custom Payload (vvb:backend)
+ ▼
  Minecraft Client
-   │
+ │
  VVB Fabric Mod
-   │
+ │
  Voxy Adapter
-   ▼
+ ▼
  Voxy
 ```
 
-- **Velocity 插件**（`vvb-velocity`）：获取玩家当前后端，监听切换，通过自定义 payload 通道把后端逻辑 ID 发送给客户端
-- **Fabric 模组**（`voxy-velocity-bridge`）：接收 backend ID，维护状态机，在 Voxy 创建 WorldIdentifier 前注入 backend namespace，切服时正确重建渲染器
+- **Velocity 插件**（`voxy-velocity-bridge-vc`）：获取玩家当前后端，监听切换，通过自定义 payload 通道把后端逻辑 ID 发送给客户端
+- **Fabric 模组**（`voxy-velocity-bridge-client`）：接收 backend ID，维护状态机，在 Voxy 创建 WorldIdentifier 前注入 backend namespace，切服时正确重建渲染器
 
 ## 4. 世界隔离原理
 
@@ -88,13 +88,13 @@ proxyNamespace + backendNamespace + dimensionKey + dimensionType + biomeSeed
 
 ```text
 /server creative
-  → Velocity 捕获 ServerPreConnectEvent
-  → 发送 PREPARE (backend = creative)
-  → 客户端记录 pendingBackend = creative
-  → 旧 ClientLevel 卸载，新 ClientLevel 创建
-  → Voxy 创建新的 WorldIdentifier（读取 backend = creative）
-  → Velocity 发送 CONFIRM
-  → 客户端确认 currentBackend = creative，重建渲染器
+ → Velocity 捕获 ServerPreConnectEvent
+ → 发送 PREPARE (backend = creative)
+ → 客户端记录 pendingBackend = creative
+ → 旧 ClientLevel 卸载，新 ClientLevel 创建
+ → Voxy 创建新的 WorldIdentifier（读取 backend = creative）
+ → Velocity 发送 CONFIRM
+ → 客户端确认 currentBackend = creative，重建渲染器
 ```
 
 客户端状态机：`currentBackend` / `pendingBackend` / `worldBackend`，退出时全部置空。
@@ -110,9 +110,9 @@ Voxy 缺失或版本不兼容时自动静默回退，不影响正常游戏。
 ```text
 .voxy/
 └── saves/
-    └── <proxy>/
-        ├── <backend A>/   ← 8ac0319...（hash 目录）
-        └── <backend B>/   ← d42f617...
+ └── <proxy>/
+ ├── <backend A>/ ← 8ac0319...（hash 目录）
+ └── <backend B>/ ← d42f617...
 ```
 
 每个 backend 独立目录，切回原服自动恢复原缓存。第一版不自动迁移旧缓存（旧缓存无法可靠判断来源，迁移可能污染新目录）。
@@ -124,25 +124,25 @@ Voxy 缺失或版本不兼容时自动静默回退，不影响正常游戏。
 ```bash
 # Fabric 客户端模组
 cd fabric
-./gradlew build          # 产物: fabric/build/libs/voxy-fabric-bridge.jar
+./gradlew build # 产物: fabric/build/libs/voxy-velocity-bridge-client.jar
 
 # Velocity 插件
 cd velocity
-./gradlew build          # 产物: velocity/build/libs/voxy-velocity-bridge.jar
+./gradlew build # 产物: velocity/build/libs/voxy-velocity-bridge-vc.jar
 ```
 
 ## 9. 部署
 
 ### Velocity 代理
 
-- 将 `voxy-velocity-bridge.jar` 放入 `plugins/` 目录
+- 将 `voxy-velocity-bridge-vc.jar` 放入 `plugins/` 目录
 - 在 `velocity.toml` 中注册后端服务器，注册名即 backend 标识（建议语义化，如 `survival`/`creative`）
 
 ### 客户端
 
 `mods/` 目录放入：
 
-- `voxy-fabric-bridge.jar`（本模组）
+- `voxy-velocity-bridge-client.jar`（本模组）
 - `voxy`（需 26.2 兼容版本）
 - 依赖：`fabric-api`、`fabric-language-kotlin`
 

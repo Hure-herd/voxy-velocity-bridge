@@ -61,7 +61,7 @@ java {
 }
 
 jar {
-	archiveBaseName = 'voxy-fabric-bridge'
+	archiveBaseName = 'voxy-velocity-bridge-client'
 	archiveVersion = ''
 	def projectName = project.name
 	inputs.property "projectName", projectName
@@ -72,7 +72,7 @@ jar {
 }
 
 sourcesJar {
-	archiveBaseName = 'voxy-fabric-bridge'
+	archiveBaseName = 'voxy-velocity-bridge-client'
 	archiveVersion = ''
 }
 
