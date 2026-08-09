@@ -62,6 +62,7 @@ java {
 
 jar {
 	archiveBaseName = 'voxy-fabric-bridge'
+	archiveVersion = ''
 	def projectName = project.name
 	inputs.property "projectName", projectName
 
@@ -72,6 +73,7 @@ jar {
 
 sourcesJar {
 	archiveBaseName = 'voxy-fabric-bridge'
+	archiveVersion = ''
 }
 
 // configure the maven publication
